@@ -5,6 +5,7 @@ import butterchurnPresets from 'butterchurn-presets';
 import { createMemo, createSignal, onMount } from 'solid-js';
 import { Select, SingleValue, Input, SelectContext, createOptions } from "@thisbeyond/solid-select";
 import "@thisbeyond/solid-select/style.css";
+import { Style } from 'solid-start';
 
 // TODO - figure out the right Tailwind-esque way to do this.
 const tw_btn_disabled = "text-gray-700 text-xs border border-grey-700 font-medium rounded-lg text-sm px-5 py-2.5 text-center mr-2 mb-2 dark:border-grey-500 dark:text-grey-500"
@@ -192,15 +193,26 @@ export default function Butterchurn() {
                 <span id="timer" class="font-bold">{timerString()}</span>
             </div>
         </div>
-        <div class="grid grid-cols-2 gap-4">
-            <div  class="flex flex-col items-center gap-1">
+        <div class="grid gap-4 justify-center">
+            {/* <div class="flex flex-col items-center gap-1"> */}
+            <div class="grid grid-cols-2 items-start justify-items-center" >
                 <canvas ref={canvas!} id='canvas' width='512' height='512' />
-                <div class="w-full text-left text-xs">{presetList()}</div>
-            </div>
-            <div class="flex flex-col items-center gap-0 bg-white">
                 <video ref={video!} id="video" controls />
-                <p>Your video will appear here ↑ when the recording is stopped.</p>
-                <p><strong>Once the video has fully loaded,</strong> click on <code>⋮</code> to download the video.</p>
+            </div>
+            {/* <div class="flex flex-col items-center gap-0 bg-white"> */}
+            <div class="inline-grid grid-cols-2 items-start">
+                <div class="w-full text-left text-xs">Preset:<br/>
+                    <style>{`
+                        .solid-select-list {
+                            background-color: white !important ;
+                        }
+                    `}</style>
+                    {presetList()}
+                </div>
+                <div>
+                    <p>Your video will appear here ↑ when the recording is stopped.</p>
+                    <p><strong>Once the video has fully loaded,</strong> click on <code>⋮</code> to download the video.</p>
+                </div>
             </div>
         </div>
     </>;
