@@ -24,7 +24,14 @@ export default function Root() {
   return (
     <Html lang="en">
       <Head>
-        <Title>Butterchurn recorder</Title>
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-830N58B5PT"></script>
+        <script>{`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer?.push(arguments)}
+          gtag('js', new Date());
+          gtag('config', 'G-830N58B5PT');
+        `}</script>        
+        <Title>Vizrecord - a Butterchurn recorder</Title>
         <Meta charset="utf-8" />
         <Meta name="viewport" content="width=device-width, initial-scale=1" />
         <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6520774740980475"
@@ -36,7 +43,7 @@ export default function Root() {
             <nav class="bg-sky-800">
               <ul class="container flex items-center p-3 text-gray-200">
                 <li class={`border-b-2 ${active("/")} mx-1.5 sm:mx-6`}>
-                  <A href="/">Butterchurn Recorder</A>
+                  <A href="/">Vizrecord</A>
                 </li>
               </ul>
             </nav>
