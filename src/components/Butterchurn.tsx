@@ -5,10 +5,10 @@ import butterchurnPresets from 'butterchurn-presets';
 import { createMemo, createSignal, onMount } from 'solid-js';
 import { Select, SingleValue, Input, SelectContext, createOptions } from "@thisbeyond/solid-select";
 import "@thisbeyond/solid-select/style.css";
-import { Style } from 'solid-start';
+import { ACRecorder, ACRecorderOptions } from './audio-recorder';
 
 // TODO - figure out the right Tailwind-esque way to do this.
-const tw_btn_disabled = "text-gray-700 text-xs border border-grey-700 font-medium rounded-lg text-sm px-5 py-2.5 text-center mr-2 mb-2 dark:border-grey-500 dark:text-grey-500"
+const tw_btn_disabled = "text-gray-300  bg-gray-100 text-xs border border-grey-700 font-medium rounded-lg text-sm px-5 py-2.5 text-center mr-2 mb-2 dark:border-grey-500 dark:text-grey-500"
 const tw_btn = "text-blue-700 text-xs hover:text-white border border-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center mr-2 mb-2 dark:border-blue-500 dark:text-blue-500 dark:hover:text-white dark:hover:bg-blue-500 dark:focus:ring-blue-800"
 
 
@@ -17,14 +17,27 @@ export default function Butterchurn() {
     let canvas: HTMLCanvasElement;
     let video: HTMLVideoElement;
     let delayedAudible: any = null;
-    let mediaRecorder: MediaRecorder | null;
-    const audioContext = new AudioContext();
+    let audioContext = new AudioContext();
     let visualizer: any = null;
+    let audioVideoRecoder : ACRecorder | null = null;
     const [audioFile, setAudioFile] = createSignal<Blob | null>();
     const [isRecording, setIsRecording] = createSignal(false);
+    const [recordingAvailable, setRecordingAvailable] = createSignal(false);
     const [recordingStartTime, setRecordingStartTime] = createSignal(0);
-    const [recordingEndTime, setRecordingEndTime] = createSignal(0);
     const [timerString, setTimerString] = createSignal("0.00s");
+
+    const recoderOptions : ACRecorderOptions = {
+        fps: 60,
+        audioBitsPerSecond: 196000,
+        videoBitsPerSecond: 30000000,
+        mimeType: MediaRecorder.isTypeSupported("video/mp4;codecs=h264,vp9,opus") ? "video/mp4;codecs=h264,vp9,opus"
+                    : MediaRecorder.isTypeSupported("video/webm;codecs=h264,vp9,opus") ? "video/webm;codecs=h264,vp9,opus"
+                    : MediaRecorder.isTypeSupported("video/mp4;codecs=h264") ? "video/mp4;codecs=h264"
+                    : MediaRecorder.isTypeSupported("video/webm;codecs=h264") ? "video/webm;codecs=h264"
+                    : MediaRecorder.isTypeSupported("video/mp4") ? "video/mp4"
+                    : "video/webm",
+        saveType: MediaRecorder.isTypeSupported("video/mp4") ? "mp4" : "webm", 
+    };
 
     const handleFileChange = (event: any) => {
         setAudioFile(event.target.files[0]);
@@ -33,11 +46,9 @@ export default function Butterchurn() {
     function startRenderer(): void {
         visualizer.render();
         requestAnimationFrame(() => {
-
             startRenderer();
         });
     }
-
 
     onMount(async () => {
         audioContext.resume();
@@ -61,9 +72,12 @@ export default function Butterchurn() {
     };
 
     const start = () => {
-
         audioContext.resume();
-        video.pause(); // TODO - not working
+
+        const sourceNode = audioContext.createBufferSource();
+        audioVideoRecoder = new ACRecorder(sourceNode, "#canvas", audioContext);
+        console.log("using options:", recoderOptions);
+        audioVideoRecoder.setOptions(recoderOptions);
 
         setRecordingStartTime(Date.now());
         setIsRecording(true);
@@ -79,18 +93,22 @@ export default function Butterchurn() {
                 if (delayedAudible) {
                     delayedAudible.disconnect();
                 }
-                const sourceNode = audioContext.createBufferSource();
                 sourceNode.buffer = buffer;
 
+                // Introduce small delay on audio (TODO: why?) and connect to output
                 delayedAudible = audioContext.createDelay();
                 delayedAudible.delayTime.value = 0.26;
-
                 sourceNode.connect(delayedAudible)
                 delayedAudible.connect(audioContext.destination);
-                visualizer.connectAudio(delayedAudible);
-                initRecording(delayedAudible);
+
+                // Connect audio to the visualiser
+                visualizer.connectAudio(delayedAudible); // TODO why using delayedAudible? 
+
+                // Start audio playback
                 sourceNode.start(0);
 
+                // Start recording
+                audioVideoRecoder?.start();
             }
             );
         };
@@ -99,54 +117,18 @@ export default function Butterchurn() {
         }
     }
 
-    const initRecording = (audio: any) => {
-        if (mediaRecorder) {
-            mediaRecorder.stop();
-        }
-        let videoStream = canvas.captureStream(60);
-        let mediaStreamDestination = audioContext.createMediaStreamDestination();
-        audio.connect(mediaStreamDestination);
-
-        let audioStream = mediaStreamDestination.stream;
-        const combinedStream = new MediaStream([
-            ...videoStream.getTracks(),
-            ...audioStream.getTracks(),
-        ]);
-
-
-        const options = {
-            audioBitsPerSecond: 196000,
-            videoBitsPerSecond: 10000000,
-            mimeType: "video/webm;codecs=h264,vp9,opus",
-        };
-
-        mediaRecorder = new MediaRecorder(combinedStream, options);
-        console.log(mediaRecorder, videoStream);
-        let chunks: BlobPart[] = [];
-        mediaRecorder.onstop = function (e) {
-            let blob = new Blob(chunks, { 'type': 'video/mp4' });
-            chunks = [];
-            let videoURL = URL.createObjectURL(blob);
-            video.src = videoURL;
-        };
-        mediaRecorder.ondataavailable = function (e) {
-            if (e.data.size > 0) {
-                chunks.push(e.data);
-            }
-        };
-        mediaRecorder.start();
-    }
-
     const stop = () => {
         setIsRecording(false);
-        setRecordingEndTime(Date.now());
-        if (delayedAudible) {
-            delayedAudible.disconnect();
-        }
-        if (mediaRecorder) {
-            mediaRecorder.stop();
-            mediaRecorder = null;
-        }
+        audioVideoRecoder?.stop();
+        delayedAudible?.disconnect();        
+        setTimeout(async () => {
+            audioVideoRecoder?.preview("", document.querySelector("#video") as HTMLVideoElement).then(() => {
+                setRecordingAvailable(true);
+            }).catch((e) => {
+                setRecordingAvailable(false);
+                console.error("Could not initialize preview - problem with recording?", e);
+            });
+        });
     }
 
     const presetList = createMemo(() => {
@@ -161,7 +143,7 @@ export default function Butterchurn() {
     return <>
         <div class="grid grid-cols-3 gap-4 border-y-2 py-2 mb-5 ">
             <div>
-                <label class="block mb-2 text-sm font-medium text-gray-900 dark:text-white" for="file_input">Pick an audio file</label>
+                <label class="block mb-2 text-sm font-medium text-red-600 dark:text-white" for="file_input">Pick an audio file</label>
                 <input
                     id="file_input"
                     type="file"
@@ -212,14 +194,19 @@ export default function Butterchurn() {
                     <video height={512} width={512} ref={video!} id="video" controls />
                 </div>                
                 <div>
-                    <p>Your video will appear here when the recording is stopped.</p>
+                    <p>Your video will appear here ↑ when the recording is stopped.</p>
+                    <button
+                    type="button"
+                    disabled={!recordingAvailable()}
+                    class={!recordingAvailable() ? tw_btn_disabled : tw_btn}
+                    onClick={() => { audioVideoRecoder?.download(); }}
+                >
+                    Download video
+                </button>                    
                 </div>
-                <div class="mx-10 text-left text-xs p-2 mt-4 text-yellow-800 rounded-lg bg-yellow-50 dark:bg-gray-800 dark:text-yellow-300" role="alert">
-                    <p>A few glitches to be aware of (fixes coming soon):</p>
-                    <ul class="list-disc list-inside">
-                        <li>You can only download the video once it has played from start to finish (after which the <code>⋮</code> menu will have a download option).</li>
-                        <li>The downloaded video may fail to open in some tools. To remedy this, re-save it with ffmpeg, e.g. <code>ffmpeg -i in.mp4 -vcodec libx264 -crf 20 out.mp4</code> </li>
-                    </ul>
+                <div class="mx-10 text-left text-xs p-2  text-yellow-800 rounded-lg bg-yellow-50 dark:bg-gray-800 dark:text-yellow-300" role="alert">
+                    <p>⚠️ The downloaded video may fail to open in some tools. To remedy this, re-save it with ffmpeg, e.g.:
+                        <br/><code>ffmpeg -i in.mp4 -vcodec libx264 -crf 20 out.mp4</code>.</p>
                 </div>
 
  
