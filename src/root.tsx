@@ -14,6 +14,9 @@ import {
   Title,
 } from "solid-start";
 import "./root.css";
+import { unstable_clientOnly } from 'solid-start';
+
+const Header = unstable_clientOnly(() => import("~/components/Header"));
 
 export default function Root() {
   const location = useLocation();
@@ -36,16 +39,13 @@ export default function Root() {
         <Meta name="viewport" content="width=device-width, initial-scale=1" />
         <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6520774740980475"
      crossorigin="anonymous"></script>
+        <link rel="icon" type="image/x-icon" href="/favicon.png"></link>
       </Head>
       <Body>
         <Suspense>
           <ErrorBoundary>
             <nav class="bg-sky-800">
-              <ul class="container flex items-center p-3 text-gray-200">
-                <li class={`border-b-2 ${active("/")} mx-1.5 sm:mx-6`}>
-                  <A href="/">Vizrecord</A>
-                </li>
-              </ul>
+              <Header />
             </nav>
             <Routes>
               <FileRoutes />

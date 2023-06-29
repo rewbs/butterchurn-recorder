@@ -10,6 +10,7 @@
     "strict": true,
     "types": ["solid-start/env"],
     "baseUrl": "./",
+    "resolveJsonModule": true,
     "paths": {
       "~/*": ["./src/*"]
     }
