@@ -1,4 +1,4 @@
-//@ts-expect-error
+//@ts-ignore
 import fs from 'fs';
 import { json } from "solid-start";
 
