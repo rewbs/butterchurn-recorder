@@ -1,8 +1,13 @@
 import { A } from "solid-start";
-
 import { unstable_clientOnly } from 'solid-start';
+import { createServerData$ } from 'solid-start/server';
+import { rawFilenames } from './api/audioFiles'
 
 const Butterchurn = unstable_clientOnly(() => import("~/components/Butterchurn"));
+
+export function routeData() {
+  return createServerData$(() => rawFilenames());
+}
 
 export default function Home() {
   return (
@@ -13,9 +18,6 @@ export default function Home() {
       <Butterchurn />
       <hr />
       <div class="w-full border-y-2 mt-5 pb-6 grid grid-cols-2 items-center justify-items-center" >
-        <div>
-          
-        </div>
         <div class="mt-8 w-80 text-xs text-right">
           <p>
             This is a wrapper around <A href="https://butterchurnviz.com/" class="text-sky-600 hover:underline">Butterchurn</A>&nbsp;

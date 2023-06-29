@@ -2,10 +2,12 @@
 import butterchurn from 'butterchurn';
 //@ts-expect-error
 import butterchurnPresets from 'butterchurn-presets';
+import { Select, createOptions } from "@thisbeyond/solid-select";
 import { createMemo, createSignal, onMount } from 'solid-js';
-import { Select, SingleValue, Input, SelectContext, createOptions } from "@thisbeyond/solid-select";
-import "@thisbeyond/solid-select/style.css";
+import ExampleAudioList from './ExampleAudioList';
 import { ACRecorder, ACRecorderOptions } from './audio-recorder';
+import "@thisbeyond/solid-select/style.css";
+
 
 // TODO - figure out the right Tailwind-esque way to do this.
 const tw_btn_disabled = "text-gray-300  bg-gray-100 text-xs border border-grey-700 font-medium rounded-lg text-sm px-5 py-2.5 text-center mr-2 mb-2 dark:border-grey-500 dark:text-grey-500"
@@ -21,10 +23,13 @@ export default function Butterchurn() {
     let visualizer: any = null;
     let audioVideoRecoder : ACRecorder | null = null;
     const [audioFile, setAudioFile] = createSignal<Blob | null>();
+    const [audioUrl, setAudioUrl] = createSignal<string | null>();
+    const [audioDataType, setAudioDataType] = createSignal<"file"|"url">();
     const [isRecording, setIsRecording] = createSignal(false);
     const [recordingAvailable, setRecordingAvailable] = createSignal(false);
     const [recordingStartTime, setRecordingStartTime] = createSignal(0);
     const [timerString, setTimerString] = createSignal("0.00s");
+
 
     const recoderOptions : ACRecorderOptions = {
         fps: 60,
@@ -37,10 +42,6 @@ export default function Butterchurn() {
                     : MediaRecorder.isTypeSupported("video/mp4") ? "video/mp4"
                     : "video/webm",
         saveType: MediaRecorder.isTypeSupported("video/mp4") ? "mp4" : "webm", 
-    };
-
-    const handleFileChange = (event: any) => {
-        setAudioFile(event.target.files[0]);
     };
 
     function startRenderer(): void {
@@ -71,7 +72,7 @@ export default function Butterchurn() {
         setTimerString(((Date.now() - recordingStartTime()) / 1000).toFixed(2) + 's');
     };
 
-    const start = () => {
+    const start = async () => {
         audioContext.resume();
 
         const sourceNode = audioContext.createBufferSource();
@@ -82,38 +83,43 @@ export default function Butterchurn() {
         setRecordingStartTime(Date.now());
         setIsRecording(true);
 
-        // Kick off audio playback and visualiser
-        var reader = new FileReader();
-        reader.onload = (event) => {
-            if (!event?.target?.result) {
-                return;
+        // Callback to process the audio buffer
+        const processBuffer = (buffer: AudioBuffer): void => {
+            if (delayedAudible) {
+                delayedAudible.disconnect();
             }
-            //@ts-expect-error
-            audioContext.decodeAudioData(event.target.result, (buffer) => {
-                if (delayedAudible) {
-                    delayedAudible.disconnect();
-                }
-                sourceNode.buffer = buffer;
+            sourceNode.buffer = buffer;
+            // Introduce small delay on audio (TODO: why?) and connect to output
+            delayedAudible = audioContext.createDelay();
+            delayedAudible.delayTime.value = 0.1;
+            sourceNode.connect(delayedAudible);
+            delayedAudible.connect(audioContext.destination);
+            // Connect audio to the visualiser
+            visualizer.connectAudio(sourceNode); // TODO original used delayedAudible but this makes more sense? 
 
-                // Introduce small delay on audio (TODO: why?) and connect to output
-                delayedAudible = audioContext.createDelay();
-                delayedAudible.delayTime.value = 0.26;
-                sourceNode.connect(delayedAudible)
-                delayedAudible.connect(audioContext.destination);
-
-                // Connect audio to the visualiser
-                visualizer.connectAudio(delayedAudible); // TODO why using delayedAudible? 
-
-                // Start audio playback
-                sourceNode.start(0);
-
-                // Start recording
-                audioVideoRecoder?.start();
+            // Automatically stop recording at the end of the audio
+            sourceNode.onended = () => {
+                console.log("Audio end detected.");
+                stop();
             }
-            );
+
+            // Start audio playback
+            sourceNode.start(0);
+
+            // Start recording
+            audioVideoRecoder?.start();
         };
-        if (audioFile()) {
+                
+        if (audioFile() && audioDataType() === "file") {
+            // Process file selected by user
+            var reader = new FileReader();
+            reader.onload = (event) => audioContext.decodeAudioData((event?.target?.result as ArrayBuffer), processBuffer);
             reader.readAsArrayBuffer(audioFile() as Blob);
+        } else if (audioUrl() && audioDataType() === "url") {
+            // Process example audio url selected by user
+            const response = await fetch('audio/' + audioUrl());
+            const buffer = await response.arrayBuffer();
+            audioContext.decodeAudioData(buffer, processBuffer);
         }
     }
 
@@ -134,7 +140,7 @@ export default function Butterchurn() {
     const presetList = createMemo(() => {
         const props = createOptions(Object.keys(butterchurnPresets.getPresets()));
         return <Select
-            onChange={(e) => { console.log(e); visualizer.loadPreset(butterchurnPresets.getPresets()[e], 0.0); }}
+            onChange={(e) => { visualizer.loadPreset(butterchurnPresets.getPresets()[e], 0.0); }}
             placeholder='Select a preset...'
             {...props}
         />
@@ -143,20 +149,31 @@ export default function Butterchurn() {
     return <>
         <div class="grid grid-cols-3 gap-4 border-y-2 py-2 mb-5 ">
             <div>
-                <label class="block mb-2 text-sm font-medium text-red-600 dark:text-white" for="file_input">Pick an audio file</label>
+                <label class="block mb-2 text-sm font-medium dark:text-white" for="file_input">{audioDataType() === "file" ? "✅" : ""} Pick a local audio file (file is not uploaded):</label>
                 <input
                     id="file_input"
                     type="file"
                     class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 dark:text-gray-400 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400"
-                    onChange={handleFileChange}
+                    onChange={(e : any) => {
+                        setAudioDataType("file");
+                        setAudioFile(e.target.files[0]);
+                    }}
                     onClick={(e: Event) => ((e.target as HTMLInputElement).value as string | null) = null}
                 />
+                <label class="block mb-2 text-sm font-medium dark:text-white pt-1"  for="file_input">{audioDataType() === "url" ? "✅" : ""} Or use an example track:</label>
+                <ExampleAudioList 
+                    onChange={(e : any) => {
+                        setAudioDataType("url");
+                        setAudioUrl(e);
+                     }}
+                 />
+                
             </div>
             <div class="flex flex-col items-center gap-1">
                 <button
                     type="button"
-                    disabled={!audioFile()}
-                    class={!audioFile() ? tw_btn_disabled : tw_btn}
+                    disabled={!(audioFile() || audioUrl())}
+                    class={!(audioFile() || audioUrl()) ? tw_btn_disabled : tw_btn}
                     onClick={() => { start() }}
                 >
                     Start play & record
@@ -208,7 +225,6 @@ export default function Butterchurn() {
                     <p>⚠️ The downloaded video may fail to open in some tools. To remedy this, re-save it with ffmpeg, e.g.:
                         <br/><code>ffmpeg -i in.mp4 -vcodec libx264 -crf 20 out.mp4</code>.</p>
                 </div>
-
  
             </div>
         </div>
