@@ -1,6 +1,6 @@
 # butterchurn-recorder
 
-## [🚀 See it live here](https://butterchurn-recorder.vercel.app/)
+## [🚀 See it live here](https://vizrecord.app/)
 
 This is a wrapper around [Butterchurn](https://butterchurnviz.com/) (a wonderful Javascript implementation of the venerable [Milkdrop2](https://www.geisswerks.com/about_milkdrop.html) audio visualisation tool),  modified to allow you to record and download audio visualisation videos.
 
