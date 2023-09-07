@@ -15,14 +15,17 @@
     "vite": "^4.3.9"
   },
   "dependencies": {
+    "@codemirror/lang-json": "^6.0.1",
     "@solidjs/meta": "^0.28.5",
     "@solidjs/router": "^0.8.2",
     "@thisbeyond/solid-select": "^0.14.0",
+    "@uiw/codemirror-theme-material": "^4.21.13",
     "butterchurn": "^2.6.7",
     "butterchurn-presets": "^2.4.7",
     "flowbite": "^1.6.6",
     "fs": "^0.0.1-security",
-    "solid-icons": "^1.0.9",    
+    "solid-codemirror": "^2.3.0",
+    "solid-icons": "^1.0.9",
     "solid-js": "^1.7.7",
     "solid-start": "^0.2.26",
     "solid-start-vercel": "^0.2.26"
